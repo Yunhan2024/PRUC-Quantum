@@ -35,6 +35,12 @@ public class Preprocess {
 
         File file = null;
         switch (dataset) {
+            case "50":
+                file = new File("DataFile/50/connected_50_areas.shp");
+                break;
+            case "500":
+                file = new File("DataFile/500/500.shp");
+                break;
             case "2k":
                 file = new File("DataFile/2056dataset/merged.shp");
                 break;
@@ -100,6 +106,18 @@ public class Preprocess {
                     internal_attr  = Long.parseLong(feature.getAttribute("awater").toString());
                 }
 
+                else if(dataset.equals("50")) // 专门为50个区域的子集处理
+                {
+                    internal_attr = Long.parseLong((feature.getAttribute("aland").toString())); // 使用aland作为内部属性
+                    extensive_attr = Long.parseLong(feature.getAttribute("aland").toString()); // 使用awater作为广域属性
+                }
+
+                else if(dataset.equals("500")) // 专门为500个区域的子集处理
+                {
+                    internal_attr = Long.parseLong((feature.getAttribute("aland").toString())); // 使用aland作为内部属性
+                    extensive_attr = Long.parseLong(feature.getAttribute("aland").toString()); // 使用awater作为广域属性
+                }
+
                 else if(dataset.equals("diversity"))
                 {
                     extensive_attr = (long)Double.parseDouble((feature.getAttribute("cty_pop200").toString()));
@@ -109,8 +127,8 @@ public class Preprocess {
 
                 else
                 {
-                    extensive_attr = Long.parseLong((feature.getAttribute("ALAND").toString()));
-                    internal_attr  = Long.parseLong(feature.getAttribute("AWATER").toString());
+                    extensive_attr = Long.parseLong((feature.getAttribute("aland").toString()));
+                    internal_attr  = Long.parseLong(feature.getAttribute("awater").toString());
                 }
 
                 Geometry polygon = (Geometry) feature.getDefaultGeometry();
