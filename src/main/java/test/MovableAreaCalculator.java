@@ -5,8 +5,13 @@ import util.Area;
 import util.Preprocess;
 import util.Region;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.*;
+import com.github.cliftonlabs.json_simple.JsonObject;
+import com.github.cliftonlabs.json_simple.JsonArray;
 
 /**
  * This class calculates and analyzes movable areas in a region-based solution
@@ -18,7 +23,6 @@ public class MovableAreaCalculator {
 
     // Maps to store the analysis results
     private Map<Integer, List<Integer>> movableAreas; // Region index -> Movable area indices
-    private Map<Integer, List<Integer>> fixedAreas;   // Region index -> Fixed area indices
     private Map<Integer, List<Integer>> potentialDestinations; // Area index -> Potential destination region indices
 
     /**
@@ -35,17 +39,14 @@ public class MovableAreaCalculator {
 
         // Initialize result maps
         this.movableAreas = new HashMap<>();
-        this.fixedAreas = new HashMap<>();
         this.potentialDestinations = new HashMap<>();
 
         for (int i = 0; i < regions.length; i++) {
             movableAreas.put(i, new ArrayList<>());
-            fixedAreas.put(i, new ArrayList<>());
         }
 
         // Run the analysis
         findMovableAreas();
-        findFixedAreas();
         findPotentialDestinations();
     }
 
@@ -107,7 +108,7 @@ public class MovableAreaCalculator {
         // Create regions array
         regions = new Region[regionAssignments.length];
 
-        // Initialize each region with its first area
+        // Initialize regions and add areas to them
         for (int i = 0; i < regions.length; i++) {
             for (Area area : allAreas) {
                 if (area.get_associated_region_index() == i) {
@@ -115,14 +116,12 @@ public class MovableAreaCalculator {
                     break;
                 }
             }
-        }
 
-        // Add remaining areas to their regions
-        for (Area area : allAreas) {
-            int regionIndex = area.get_associated_region_index();
-            if (regionIndex >= 0 && regionIndex < regions.length) {
-                if (!regions[regionIndex].get_areas_in_region().contains(area)) {
-                    regions[regionIndex].add_area_to_region(area);
+            // Add remaining areas to their regions
+            for (Area area : allAreas) {
+                if (area.get_associated_region_index() == i &&
+                        !regions[i].get_areas_in_region().contains(area)) {
+                    regions[i].add_area_to_region(area);
                 }
             }
         }
@@ -153,23 +152,6 @@ public class MovableAreaCalculator {
     }
 
     /**
-     * Find fixed areas (non-movable) in each region
-     */
-    private void findFixedAreas() {
-        for (int i = 0; i < regions.length; i++) {
-            Region region = regions[i];
-            List<Integer> movable = movableAreas.get(i);
-
-            // All areas in region that are not movable are fixed
-            for (Area area : region.get_areas_in_region()) {
-                if (!movable.contains(area.get_geo_index())) {
-                    fixedAreas.get(i).add(area.get_geo_index());
-                }
-            }
-        }
-    }
-
-    /**
      * Find potential destination regions for all areas
      */
     private void findPotentialDestinations() {
@@ -179,7 +161,7 @@ public class MovableAreaCalculator {
             allMovableAreaIndices.addAll(areaIndices);
         }
 
-        // For each area in the dataset
+        // For each movable area in the dataset
         for (Area area : allAreas) {
             int areaIndex = area.get_geo_index();
             // Skip if not a movable area
@@ -205,24 +187,25 @@ public class MovableAreaCalculator {
     }
 
     /**
-     * Calculate mean value of fixed areas in each region
+     * Calculate mean value of all areas in each region
      */
-    private Map<Integer, Double> calculateFixedAreasMeans() {
+    private Map<Integer, Double> calculateRegionMeans() {
         Map<Integer, Double> means = new HashMap<>();
 
-        for (int regionIndex : fixedAreas.keySet()) {
-            List<Integer> areas = fixedAreas.get(regionIndex);
+        for (int i = 0; i < regions.length; i++) {
+            Region region = regions[i];
+            ArrayList<Area> areas = region.get_areas_in_region();
+
             if (areas.isEmpty()) {
-                means.put(regionIndex, 0.0);
+                means.put(i, 0.0);
                 continue;
             }
 
             double sum = 0;
-            for (int areaIndex : areas) {
-                // Using internal attribute for the mean calculation
-                sum += allAreas.get(areaIndex).get_internal_attr();
+            for (Area area : areas) {
+                sum += area.get_internal_attr();
             }
-            means.put(regionIndex, sum / areas.size());
+            means.put(i, sum / areas.size());
         }
 
         return means;
@@ -232,15 +215,15 @@ public class MovableAreaCalculator {
      * Print the analysis results in the required format
      */
     public void printResults() {
-        // Print number of fixed areas in each region
+        // Print number of areas in each region
         System.out.println("number_of_areas= {");
         for (int i = 0; i < regions.length; i++) {
             System.out.println("  " + i + ": [" + regions[i].get_region_size() + "],");
         }
         System.out.println("}");
 
-        // Print mean values of fixed areas in each region
-        Map<Integer, Double> means = calculateFixedAreasMeans();
+        // Print mean values of all areas in each region
+        Map<Integer, Double> means = calculateRegionMeans();
         System.out.println("region_areas_means = {");
         for (int i = 0; i < regions.length; i++) {
             System.out.println("  " + i + ":[" + means.get(i) + "]");
@@ -281,16 +264,138 @@ public class MovableAreaCalculator {
     }
 
     /**
+     * Creates a JSON object containing all the analysis results
+     */
+    @SuppressWarnings("unchecked")
+    public JsonObject createJsonResults() {
+        JsonObject results = new JsonObject();
+
+        // Number of areas in each region
+        JsonObject numAreas = new JsonObject();
+        for (int i = 0; i < regions.length; i++) {
+            JsonArray regionSize = new JsonArray();
+            regionSize.add(Integer.valueOf(regions[i].get_region_size()));
+            numAreas.put(String.valueOf(i), regionSize);
+        }
+        results.put("number_of_areas", numAreas);
+
+        // Mean values of areas in each region
+        JsonObject regionMeans = new JsonObject();
+        Map<Integer, Double> means = calculateRegionMeans();
+        for (int i = 0; i < regions.length; i++) {
+            JsonArray meanArray = new JsonArray();
+            meanArray.add(means.get(i));
+            regionMeans.put(String.valueOf(i), meanArray);
+        }
+        results.put("region_areas_means", regionMeans);
+
+        // Movable areas for each region
+        JsonObject movableAreasJson = new JsonObject();
+        for (int i = 0; i < regions.length; i++) {
+            JsonArray areasList = new JsonArray();
+            List<Integer> areas = movableAreas.get(i);
+            for (Integer area : areas) {
+                areasList.add(area);
+            }
+            movableAreasJson.put(String.valueOf(i), areasList);
+        }
+        results.put("movable_areas", movableAreasJson);
+
+        // Potential destinations for movable areas
+        JsonObject potentialDestsJson = new JsonObject();
+        List<Integer> sortedAreaIndices = new ArrayList<>(potentialDestinations.keySet());
+        Collections.sort(sortedAreaIndices);
+        for (int areaIndex : sortedAreaIndices) {
+            JsonArray destsList = new JsonArray();
+            List<Integer> destinations = potentialDestinations.get(areaIndex);
+            for (Integer dest : destinations) {
+                destsList.add(dest);
+            }
+            potentialDestsJson.put(String.valueOf(areaIndex), destsList);
+        }
+        results.put("potential_destinations", potentialDestsJson);
+
+        return results;
+    }
+
+    /**
+     * Save the analysis results to a JSON file
+     *
+     * @param filename The name of the file to save to
+     * @throws IOException If there's an error writing to the file
+     */
+    public void saveToJson(String filename) throws IOException {
+        JsonObject results = createJsonResults();
+
+        // Create the output directory if it doesn't exist
+        File file = new File(filename);
+        File parentDir = file.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
+        // Write the JSON to file
+        try (Writer writer = new FileWriter(filename)) {
+            writer.write(results.toJson());
+        }
+
+        System.out.println("Results saved to " + filename);
+    }
+
+    /**
      * Main method to test the calculator with a dataset
      */
     public static void main(String[] args) {
         try {
+            String dataset = "2k";
+            long threshold = 0;
+            String outputFile = "output/movable_areas_data.json";
+
+            // Parse command line arguments if provided
+            if (args.length > 0) {
+                for (int i = 0; i < args.length; i++) {
+                    if ("-d".equals(args[i]) || "--dataset".equals(args[i])) {
+                        if (i+1 < args.length) {
+                            dataset = args[++i];
+                        }
+                    } else if ("-t".equals(args[i]) || "--threshold".equals(args[i])) {
+                        if (i+1 < args.length) {
+                            threshold = Long.parseLong(args[++i]);
+                        }
+                    } else if ("-o".equals(args[i]) || "--output".equals(args[i])) {
+                        if (i+1 < args.length) {
+                            outputFile = args[++i];
+                        }
+                    } else if ("-h".equals(args[i]) || "--help".equals(args[i])) {
+                        System.out.println("Usage: java MovableAreaCalculator [options]");
+                        System.out.println("Options:");
+                        System.out.println("  -d, --dataset DATASET    Specify the dataset (default: 2k)");
+                        System.out.println("  -t, --threshold VALUE    Specify the threshold value (default: 0)");
+                        System.out.println("  -o, --output FILE        Specify the output JSON file (default: output/movable_areas_data.json)");
+                        System.out.println("  -h, --help               Show this help message");
+                        return;
+                    }
+                }
+            }
+
+            System.out.println("Dataset: " + dataset);
+            System.out.println("Threshold: " + threshold);
+            System.out.println("Output file: " + outputFile);
+
             // Create and run the calculator
-            MovableAreaCalculator calculator = new MovableAreaCalculator("2k", 0);
+            MovableAreaCalculator calculator = new MovableAreaCalculator(dataset, threshold);
+
+            // Print results to console
             calculator.printResults();
+
+            // Save results to JSON file
+            calculator.saveToJson(outputFile);
+
         } catch (IOException e) {
-            System.err.println("Error loading dataset: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
+        } catch (NumberFormatException e) {
+            System.err.println("Error parsing numeric argument: " + e.getMessage());
         }
     }
 }
