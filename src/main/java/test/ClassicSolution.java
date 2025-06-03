@@ -17,12 +17,12 @@ public class ClassicSolution {
 
     public static void main(String[] args) throws IOException, CloneNotSupportedException, InterruptedException {
         // Config parameters
-        int iterGSLO = 100;      // Number of GSLO runs
+        int iterGSLO = 20;      // Number of GSLO runs
 
         // Datasets to test
-        String[] datasets = {"50"};
+        String[] datasets = {"2k"};
 
-        ArrayList<Area> areas = Preprocess.GeoSetBuilder("50");
+        ArrayList<Area> areas = Preprocess.GeoSetBuilder("2k");
         long heterogeneity = 0;
 
 // 计算异质性（所有区域对之间internal_attr的绝对差值之和）
@@ -58,7 +58,7 @@ public class ClassicSolution {
         long threshold = 0;
 
         // Test with different p values
-        for (int p = 3; p <= 5; p += 5) {
+        for (int p = 25; p <= 25; p += 5) {
             System.out.println("\n----- Testing with p = " + p + " -----");
 
             // Results storage

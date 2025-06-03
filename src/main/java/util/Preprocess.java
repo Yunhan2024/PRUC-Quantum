@@ -103,7 +103,7 @@ public class Preprocess {
                 if(dataset.equals("2k"))
                 {
                     extensive_attr = Long.parseLong((feature.getAttribute("aland").toString()));
-                    internal_attr  = Long.parseLong(feature.getAttribute("awater").toString());
+                    internal_attr  = Long.parseLong(feature.getAttribute("aland").toString());
                 }
 
                 else if(dataset.equals("50")) // 专门为50个区域的子集处理
@@ -127,8 +127,8 @@ public class Preprocess {
 
                 else
                 {
-                    extensive_attr = Long.parseLong((feature.getAttribute("aland").toString()));
-                    internal_attr  = Long.parseLong(feature.getAttribute("awater").toString());
+                    extensive_attr = Long.parseLong((feature.getAttribute("ALAND").toString()));
+                    internal_attr  = Long.parseLong(feature.getAttribute("ALAND").toString());
                 }
 
                 Geometry polygon = (Geometry) feature.getDefaultGeometry();
